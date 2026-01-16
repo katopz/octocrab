@@ -1,4 +1,5 @@
-use octocrab::models::{InstallationRepositories, InstallationToken};
+use octocrab::auth::AppAuth;
+use octocrab::models::{AppId, InstallationRepositories, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
 use octocrab::Octocrab;
 use url::Url;
@@ -7,11 +8,12 @@ use url::Url;
 async fn main() -> octocrab::Result<()> {
     let app_id = read_env_var("GITHUB_APP_ID");
     let app_private_key = read_env_var("GITHUB_APP_PRIVATE_KEY");
-    let key = jsonwebtoken::EncodingKey::from_rsa_pem(app_private_key.as_bytes()).unwrap();
 
-    let token = octocrab::auth::create_jwt(app_id.parse::<u64>().unwrap().into(), &key).unwrap();
+    let app_auth = AppAuth::new(AppId(app_id.parse().unwrap()), &app_private_key)?;
 
-    let octocrab = Octocrab::builder().personal_token(token).build()?;
+    let octocrab = Octocrab::builder()
+        .personal_token(app_auth.generate_bearer_token()?)
+        .build()?;
 
     let installations = octocrab
         .apps()

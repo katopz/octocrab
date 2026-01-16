@@ -216,7 +216,10 @@ mod error;
 mod from_response;
 mod page;
 
+pub mod internal;
+
 pub mod auth;
+use auth::{AppAuth, Auth};
 pub mod etag;
 pub mod models;
 pub mod params;
@@ -257,8 +260,7 @@ use http::request::Builder;
 use hyper_tls::HttpsConnector;
 
 #[cfg(feature = "rustls")]
-use hyper_rustls::HttpsConnectorBuilder;
-
+// Removed: use hyper_rustls::HttpsConnectorBuilder;
 #[cfg(feature = "retry")]
 use tower::retry::{Retry, RetryLayer};
 
@@ -282,7 +284,6 @@ use crate::service::middleware::extra_headers::ExtraHeadersLayer;
 #[cfg(feature = "retry")]
 use crate::service::middleware::retry::RetryConfig;
 
-use auth::{AppAuth, Auth};
 use models::{AppId, InstallationId, InstallationToken, RepositoryId, UserId};
 
 pub use self::{
@@ -301,8 +302,13 @@ compile_error!(
     "feature \"jwt-rust-crypto\" and feature \"jwt-aws-lc-rs\" cannot be enabled at the same time"
 );
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(not(any(feature = "jwt-rust-crypto", feature = "jwt-aws-lc-rs")))]
-compile_error!("at least one of the features \"jwt-rust-crypto\" and feature \"jwt-aws-lc-rs\" must be enabled");
+compile_error!("at least one of the features \"jwt-rust-crypto\" or \"jwt-aws-lc-rs\" must be enabled for native builds");
+
+#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "jwt-wasm"))]
+compile_error!("feature \"jwt-wasm\" must be enabled for WASM builds");
 
 /// A convenience type with a default error type of [`Error`].
 pub type Result<T, E = error::Error> = std::result::Result<T, E>;
@@ -641,9 +647,22 @@ impl OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady>
 
     /// Authenticate as a Github App.
     /// `key`: RSA private key in DER or PEM formats.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn app(mut self, app_id: AppId, key: jsonwebtoken::EncodingKey) -> Self {
-        self.config.auth = Auth::App(AppAuth { app_id, key });
+        self.config.auth = Auth::App(AppAuth {
+            app_id,
+            key: crate::internal::jwt::EncodingKey::Native(key),
+        });
         self
+    }
+
+    /// Authenticate as a Github App.
+    /// `key`: RSA private key in PEM format.
+    #[cfg(target_arch = "wasm32")]
+    pub fn app(mut self, app_id: AppId, key: &str) -> Result<Self> {
+        let app_auth = AppAuth::new(app_id, key)?;
+        self.config.auth = Auth::App(app_auth);
+        Ok(self)
     }
 
     /// Authenticate as a Basic Auth
@@ -697,10 +716,10 @@ impl OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady>
 
     #[cfg(feature = "retry")]
     #[cfg_attr(docsrs, doc(cfg(feature = "retry")))]
-    pub fn set_connector_retry_service<S>(
+    pub fn set_connector_retry_service(
         &self,
-        connector: hyper_util::client::legacy::Client<S, OctoBody>,
-    ) -> Retry<RetryConfig, hyper_util::client::legacy::Client<S, OctoBody>> {
+        connector: crate::internal::http_client::HttpClient,
+    ) -> Retry<RetryConfig, crate::internal::http_client::HttpClient> {
         let retry_layer = RetryLayer::new(self.config.retry_config.clone());
 
         retry_layer.layer(connector)
@@ -727,36 +746,12 @@ impl OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady>
     #[cfg(feature = "default-client")]
     #[cfg_attr(docsrs, doc(cfg(feature = "default-client")))]
     pub fn build(self) -> Result<Octocrab> {
-        let client: hyper_util::client::legacy::Client<_, OctoBody> = {
-            #[cfg(all(not(feature = "opentls"), not(feature = "rustls")))]
-            let mut connector = hyper::client::conn::http1::HttpConnector::new();
-
-            #[cfg(all(feature = "rustls", not(feature = "opentls")))]
-            let connector = {
-                let builder = HttpsConnectorBuilder::new();
-                #[cfg(feature = "rustls-webpki-tokio")]
-                let builder = builder.with_webpki_roots();
-                #[cfg(not(feature = "rustls-webpki-tokio"))]
-                let builder = builder
-                    .with_native_roots()
-                    .map_err(Into::into)
-                    .context(error::OtherSnafu)?; // enabled the `rustls-native-certs` feature in hyper-rustls
-
-                builder
-                    .https_or_http() //  Disable .https_only() during tests until: https://github.com/LukeMathWalker/wiremock-rs/issues/58 is resolved. Alternatively we can use conditional compilation to only enable this feature in tests, but it becomes rather ugly with integration tests.
-                    .enable_http1()
-                    .build()
-            };
-
-            #[cfg(all(feature = "opentls", not(feature = "rustls")))]
-            let connector = HttpsConnector::new();
-
-            #[cfg(feature = "timeout")]
-            let connector = self.set_connect_timeout_service(connector);
-
-            hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
-                .build(connector)
-        };
+        // Use the platform-appropriate HTTP client
+        let client =
+            crate::internal::http_client::create_client().map_err(|e| crate::Error::Other {
+                source: Box::from(e),
+                backtrace: snafu::Backtrace::capture(),
+            })?;
 
         #[cfg(feature = "retry")]
         let client = self.set_connector_retry_service(client);
@@ -1050,6 +1045,15 @@ pub enum AuthState {
     },
 }
 
+/// Platform-specific HTTP service type alias
+#[cfg(not(target_arch = "wasm32"))]
+pub type OctocrabService = Buffer<
+    http::Request<OctoBody>,
+    <BoxService<http::Request<OctoBody>, http::Response<BoxBody<Bytes, Error>>, BoxError> as tower::Service<http::Request<OctoBody>>>::Future
+>;
+
+/// Platform-specific HTTP service type alias for WASM
+#[cfg(target_arch = "wasm32")]
 pub type OctocrabService = Buffer<
     http::Request<OctoBody>,
     <BoxService<http::Request<OctoBody>, http::Response<BoxBody<Bytes, Error>>, BoxError> as tower::Service<http::Request<OctoBody>>>::Future
@@ -1194,7 +1198,7 @@ impl Octocrab {
         };
 
         let token = match token.valid_token_with_buffer(buffer) {
-            Some(token) => token.into(),
+            Some(token) => token,
             None => self.request_installation_auth_token().await?,
         };
 

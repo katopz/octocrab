@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll};
 
-type BoxBody = http_body_util::combinators::BoxBody<Bytes, crate::Error>;
+pub type BoxBody = http_body_util::combinators::BoxBody<Bytes, crate::Error>;
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 fn boxed<B>(body: B) -> BoxBody

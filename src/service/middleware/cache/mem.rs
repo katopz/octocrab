@@ -1,22 +1,18 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use crate::internal::concurrent::ConcurrentMap;
 
 use super::{CacheKey, CacheStorage, CacheWriter, CachedResponse};
 use http::{HeaderMap, Uri};
 
 pub struct InMemoryCache {
-    inner: Arc<Mutex<CacheData>>,
+    keys: ConcurrentMap<Uri, CacheKey>,
+    responses: ConcurrentMap<Uri, CachedResponse>,
 }
 
 impl InMemoryCache {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(Mutex::new(CacheData {
-                keys: HashMap::new(),
-                responses: HashMap::new(),
-            })),
+            keys: ConcurrentMap::new(),
+            responses: ConcurrentMap::new(),
         }
     }
 }
@@ -27,13 +23,9 @@ impl Default for InMemoryCache {
     }
 }
 
-struct CacheData {
-    keys: HashMap<Uri, CacheKey>,
-    responses: HashMap<Uri, CachedResponse>,
-}
-
 struct InMemoryWriter {
-    cache: Arc<Mutex<CacheData>>,
+    keys: ConcurrentMap<Uri, CacheKey>,
+    responses: ConcurrentMap<Uri, CachedResponse>,
     uri: Uri,
     key: CacheKey,
     response: CachedResponse,
@@ -41,16 +33,17 @@ struct InMemoryWriter {
 
 impl CacheStorage for InMemoryCache {
     fn try_hit(&self, uri: &Uri) -> Option<CacheKey> {
-        self.inner.lock().unwrap().keys.get(uri).cloned()
+        self.keys.get(uri)
     }
 
     fn load(&self, uri: &Uri) -> Option<CachedResponse> {
-        self.inner.lock().unwrap().responses.get(uri).cloned()
+        self.responses.get(uri)
     }
 
     fn writer(&self, uri: &Uri, key: CacheKey, headers: HeaderMap) -> Box<dyn CacheWriter> {
         Box::new(InMemoryWriter {
-            cache: self.inner.clone(),
+            keys: self.keys.clone(),
+            responses: self.responses.clone(),
             uri: uri.clone(),
             key,
             response: CachedResponse {
@@ -75,8 +68,7 @@ impl Drop for InMemoryWriter {
         let key = self.key.clone();
         let response = std::mem::take(&mut self.response);
 
-        let mut cache = self.cache.lock().unwrap();
-        cache.keys.insert(uri.clone(), key);
-        cache.responses.insert(uri, response);
+        self.keys.insert(uri.clone(), key);
+        self.responses.insert(uri, response);
     }
 }

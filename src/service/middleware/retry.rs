@@ -1,9 +1,12 @@
-use futures_util::future;
 use http::{Request, Response};
 use hyper_util::client::legacy::Error;
+use std::future::Future;
+use std::pin::Pin;
+use std::time::Duration;
 use tower::retry::Policy;
 
 use crate::body::OctoBody;
+use crate::internal::async_runtime::sleep;
 
 #[derive(Clone)]
 pub enum RetryConfig {
@@ -12,7 +15,7 @@ pub enum RetryConfig {
 }
 
 impl<B> Policy<Request<OctoBody>, Response<B>, Error> for RetryConfig {
-    type Future = futures_util::future::Ready<()>;
+    type Future = Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>;
 
     fn retry(
         &mut self,
@@ -26,7 +29,13 @@ impl<B> Policy<Request<OctoBody>, Response<B>, Error> for RetryConfig {
                     if response.status().is_server_error() || response.status() == 429 {
                         if *count > 0 {
                             *count -= 1;
-                            Some(future::ready(()))
+                            // Exponential backoff: delay doubles with each retry attempt
+                            let attempt = 3 - *count;
+                            let delay_ms = 2u64.pow(attempt.min(6) as u32) * 100;
+                            let delay = sleep(Duration::from_millis(delay_ms));
+                            Some(Box::pin(async move {
+                                delay.await;
+                            }))
                         } else {
                             None
                         }
@@ -37,7 +46,13 @@ impl<B> Policy<Request<OctoBody>, Response<B>, Error> for RetryConfig {
                 Err(_) => {
                     if *count > 0 {
                         *count -= 1;
-                        Some(future::ready(()))
+                        // Exponential backoff: delay doubles with each retry attempt
+                        let attempt = 3 - *count;
+                        let delay_ms = 2u64.pow(attempt.min(6) as u32) * 100;
+                        let delay = sleep(Duration::from_millis(delay_ms));
+                        Some(Box::pin(async move {
+                            delay.await;
+                        }))
                     } else {
                         None
                     }
