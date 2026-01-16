@@ -99,9 +99,7 @@ pub fn encoding_key_from_pem(pem: &[u8]) -> Result<EncodingKey> {
 /// Encode JWT with claims for native platforms
 #[cfg(not(target_arch = "wasm32"))]
 pub fn encode(_header: &Header, claims: &Claims, key: &EncodingKey) -> Result<String> {
-    let key = match key {
-        EncodingKey::Native(k) => k,
-    };
+    let EncodingKey::Native(key) = key;
 
     let jwt_header = jsonwebtoken::Header {
         alg: jsonwebtoken::Algorithm::RS256,
@@ -130,9 +128,7 @@ pub fn encode(header: &Header, claims: &Claims, key: &EncodingKey) -> Result<Str
     let subtle: SubtleCrypto = crypto.subtle();
 
     // Extract key data
-    let key_base64 = match key {
-        EncodingKey::Wasm(k) => k,
-    };
+    let EncodingKey::Wasm(key_base64) = key;
 
     // Decode base64 to get raw key bytes
     let key_bytes = {

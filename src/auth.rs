@@ -30,8 +30,11 @@ impl fmt::Debug for AppAuth {
 }
 
 /// The forms of authentication we support
+/// Authentication method used by the `Octocrab` client.
+#[derive(Clone, Default)]
 pub enum Auth {
     /// No authentication
+    #[default]
     None,
     // Basic HTTP authentication (username:password)
     Basic {
@@ -48,12 +51,6 @@ pub enum Auth {
     OAuth(OAuth),
     /// Authenticate using a User Access Token
     UserAccessToken(SecretString),
-}
-
-impl Default for Auth {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Create a JSON Web Token that can be used to authenticate an a GitHub application.
