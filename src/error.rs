@@ -91,7 +91,7 @@ pub enum Error {
     },
     #[snafu(display("JWT Error in {}\nFound at {}", source, backtrace))]
     JWT {
-        source: jsonwebtoken::errors::Error,
+        source: Box<dyn std::error::Error + Send + Sync>,
         backtrace: Backtrace,
     },
     Other {

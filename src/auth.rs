@@ -67,7 +67,7 @@ pub fn create_jwt(github_app_id: AppId, key: &jwt::EncodingKey) -> Result<String
                 backtrace: snafu::Backtrace::capture(),
             }
         })?
-        .as_secs();
+        .as_secs() as i64;
 
     // Github only allows JWTs that expire in the next 10 minutes.
     // The token is issued 60 seconds in the past and expires in 9 minutes,

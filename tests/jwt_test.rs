@@ -12,13 +12,8 @@ fn test_encoding_key_from_pem() {
     let key = jwt::encoding_key_from_pem(TEST_PRIVATE_KEY.as_bytes());
     assert!(key.is_ok(), "Should successfully parse PEM key");
 
-    let encoding_key = key.unwrap();
-    match encoding_key {
-        #[cfg(not(target_arch = "wasm32"))]
-        jwt::EncodingKey::Native(_) => {}
-        #[cfg(target_arch = "wasm32")]
-        jwt::EncodingKey::Wasm(_) => {}
-    }
+    let _encoding_key = key.unwrap();
+    // No longer have platform-specific variants - jwt-compact is cross-platform
 }
 
 #[test]
@@ -59,6 +54,34 @@ fn test_jwt_encoding() {
         3,
         "JWT should have 3 parts: header, payload, signature"
     );
+
+    // Verify the token format
+    let header = parts[0];
+    let payload = parts[1];
+    let signature = parts[2];
+
+    // Decode header and verify it contains "RS256"
+    let header_decoded = {
+        use base64::{engine::general_purpose, Engine as _};
+        general_purpose::URL_SAFE_NO_PAD.decode(header).unwrap()
+    };
+    let header_json: serde_json::Value = serde_json::from_slice(&header_decoded).unwrap();
+    assert_eq!(header_json["alg"], "RS256");
+    // Note: jwt-compact doesn't set "typ" field by default (it's optional in JWT spec)
+
+    // Decode payload and verify claims
+    let payload_decoded = {
+        use base64::{engine::general_purpose, Engine as _};
+        general_purpose::URL_SAFE_NO_PAD.decode(payload).unwrap()
+    };
+    let payload_json: serde_json::Value = serde_json::from_slice(&payload_decoded).unwrap();
+    assert_eq!(payload_json["iss"], TEST_APP_ID);
+    assert_eq!(payload_json["iat"], 1000);
+    assert_eq!(payload_json["exp"], 2000);
+    assert_eq!(payload_json["nbf"], 1000);
+
+    // Verify signature is not empty
+    assert!(!signature.is_empty());
 }
 
 #[test]
@@ -74,28 +97,30 @@ fn test_jwt_structure() {
 
     // Decode and verify header
     let header_part = token.split('.').next().unwrap();
-    let header_json = {
+    let header_decoded = {
         use base64::{engine::general_purpose, Engine as _};
         general_purpose::URL_SAFE_NO_PAD
             .decode(header_part)
             .unwrap()
     };
-    let header: serde_json::Value = serde_json::from_slice(&header_json).unwrap();
-    assert_eq!(header["alg"], "RS256");
-    assert_eq!(header["typ"], "JWT");
+    let header_json: serde_json::Value = serde_json::from_slice(&header_decoded).unwrap();
+    assert_eq!(header_json["alg"], "RS256");
+    // Note: jwt-compact doesn't set "typ" field by default (it's optional in JWT spec)
 
     // Decode and verify payload
     let payload_part = token.split('.').nth(1).unwrap();
-    let payload_json = {
+    let payload_decoded = {
         use base64::{engine::general_purpose, Engine as _};
         general_purpose::URL_SAFE_NO_PAD
             .decode(payload_part)
             .unwrap()
     };
-    let payload: serde_json::Value = serde_json::from_slice(&payload_json).unwrap();
+    let payload: serde_json::Value = serde_json::from_slice(&payload_decoded).unwrap();
     assert_eq!(payload["iss"], TEST_APP_ID);
     assert_eq!(payload["iat"], 1000);
     assert_eq!(payload["exp"], 2000);
+    // jwt-compact adds nbf claim by default
+    assert_eq!(payload["nbf"], 1000);
 }
 
 #[test]
@@ -186,7 +211,7 @@ fn test_jwt_time_based_claims() {
     let now = web_time::SystemTime::UNIX_EPOCH
         .elapsed()
         .unwrap()
-        .as_secs();
+        .as_secs() as i64;
 
     let claims = Claims {
         iss: TEST_APP_ID,

@@ -297,19 +297,6 @@ pub use self::{
     page::Page,
 };
 
-#[cfg(all(feature = "jwt-rust-crypto", feature = "jwt-aws-lc-rs"))]
-compile_error!(
-    "feature \"jwt-rust-crypto\" and feature \"jwt-aws-lc-rs\" cannot be enabled at the same time"
-);
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(not(any(feature = "jwt-rust-crypto", feature = "jwt-aws-lc-rs")))]
-compile_error!("at least one of the features \"jwt-rust-crypto\" or \"jwt-aws-lc-rs\" must be enabled for native builds");
-
-#[cfg(target_arch = "wasm32")]
-#[cfg(not(feature = "jwt-wasm"))]
-compile_error!("feature \"jwt-wasm\" must be enabled for WASM builds");
-
 /// A convenience type with a default error type of [`Error`].
 pub type Result<T, E = error::Error> = std::result::Result<T, E>;
 
@@ -646,19 +633,7 @@ impl OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady>
     }
 
     /// Authenticate as a Github App.
-    /// `key`: RSA private key in DER or PEM formats.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn app(mut self, app_id: AppId, key: jsonwebtoken::EncodingKey) -> Self {
-        self.config.auth = Auth::App(AppAuth {
-            app_id,
-            key: crate::internal::jwt::EncodingKey::Native(key),
-        });
-        self
-    }
-
-    /// Authenticate as a Github App.
     /// `key`: RSA private key in PEM format.
-    #[cfg(target_arch = "wasm32")]
     pub fn app(mut self, app_id: AppId, key: &str) -> Result<Self> {
         let app_auth = AppAuth::new(app_id, key)?;
         self.config.auth = Auth::App(app_auth);

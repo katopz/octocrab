@@ -19,14 +19,11 @@ request-headers = ["X-GitHub-Api-Version: 2022-11-28"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [package.metadata.docs.rs]
-# Cannot use all-features because jwt-aws-lc-rs and jwt-rust-crypto are mutually exclusive.
-# This list should include all features EXCEPT jwt-aws-lc-rs.
 # When adding new features, remember to add them here too.
 features = [
     "default-client",
     "follow-redirect",
-    "jwt-rust-crypto",
-    # "jwt-aws-lc-rs",  # Excluded: conflicts with jwt-rust-crypto
+    "jwt-compact",
     "opentls",
     "retry",
     "rustls",
@@ -82,7 +79,8 @@ hyper-rustls = { version = "0.27.0", optional = true, default-features = false, 
     "native-tokio",
     "tls12",
 ] }
-jsonwebtoken = { version = "10", default-features = false, features = ["use_pem"] }
+jwt-compact = { version = "0.8", features = ["rsa"] }
+rsa = "0.9"
 tokio = { version = "1.17.0", default-features = false, features = [
     "time",
 ], optional = true }
@@ -122,9 +120,6 @@ web-sys = { version = "0.3", features = [
     "ReadableStream",
     "AbortSignal",
     "AbortController",
-    "Crypto",
-    "SubtleCrypto",
-    "Window",
 ] }
 
 
@@ -155,7 +150,7 @@ default = [
     "tracing",
     "default-client",
     "rustls-ring",
-    "jwt-rust-crypto",
+    "jwt-compact",
 ]
 
 # WASM support
@@ -165,8 +160,7 @@ wasm = [
     "wasm-timeout",
     "tracing",
     "wasm-sync",
-    "jwt-wasm",
-    "jsonwebtoken/use_pem",
+    "jwt-compact",
 ]
 
 # Existing features
@@ -175,9 +169,7 @@ retry = ["tower/retry", "futures-util"]
 rustls = ["hyper-rustls"]
 rustls-ring = ["hyper-rustls/ring"]
 rustls-aws-lc-rs = ["hyper-rustls/aws-lc-rs"]
-jwt-aws-lc-rs = ["jsonwebtoken/aws_lc_rs"]
-jwt-rust-crypto = ["jsonwebtoken/rust_crypto"]
-jwt-wasm = []
+jwt-compact = []
 rustls-webpki-tokio = ["hyper-rustls/webpki-tokio"]
 opentls = ["hyper-tls"]
 stream = ["futures-core", "futures-util"]
