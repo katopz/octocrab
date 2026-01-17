@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models::repos::MergeCommit, Octocrab};
 use wiremock::{
     matchers::{method, path},
@@ -39,6 +39,9 @@ const COMMIT_MESSAGE: &str = "message here";
 
 #[tokio::test]
 async fn test_merges_returns_204() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let template = ResponseTemplate::new(204);
     let mock_server = setup_repos_merges_api(template).await;
     let client = setup_octocrab(&mock_server.uri());

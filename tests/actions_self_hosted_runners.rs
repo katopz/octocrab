@@ -4,7 +4,7 @@
 mod mock_error;
 
 use http::StatusCode;
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{
     models::{
         actions::{SelfHostedRunner, SelfHostedRunnerJitConfig, SelfHostedRunnerToken},
@@ -154,6 +154,9 @@ async fn test_context_with_request_body(
 
 #[tokio::test]
 async fn should_return_page_with_org_self_hosted_runners() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let expected_runners: FakePage =
         serde_json::from_str(include_str!("resources/self_hosted_runners.json")).unwrap();
     let test_context = test_context(

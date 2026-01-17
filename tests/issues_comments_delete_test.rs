@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::Octocrab;
 use wiremock::{
     matchers::{method, path},
@@ -40,6 +40,9 @@ const COMMENT_ID: u64 = 123;
 
 #[tokio::test]
 async fn should_delete_comment() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let template = ResponseTemplate::new(204);
     let mock_server = setup_remove_comment_api(template).await;
     let client = setup_octocrab(&mock_server.uri());

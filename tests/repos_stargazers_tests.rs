@@ -1,7 +1,7 @@
 // Tests for calls to the /repos/{owner}/{repo}/stargazers API.
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models::StarGazer, Octocrab, Page};
 use serde::{Deserialize, Serialize};
 use wiremock::{
@@ -40,6 +40,9 @@ const REPO: &str = "repo";
 
 #[tokio::test]
 async fn should_return_page_with_users() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let star_gazers: Vec<StarGazer> =
         serde_json::from_str(include_str!("resources/stargazers.json")).unwrap();
     let login1: String = star_gazers[0].user.as_ref().unwrap().login.clone();

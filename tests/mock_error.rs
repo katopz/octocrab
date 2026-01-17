@@ -4,6 +4,25 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
+// Global CryptoProvider initialization for rustls tests
+#[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+pub fn ensure_crypto_provider_initialized() {
+    use std::sync::OnceLock;
+
+    static INIT: OnceLock<()> = OnceLock::new();
+    INIT.get_or_init(|| {
+        #[cfg(feature = "rustls-ring")]
+        let provider = rustls::crypto::ring::default_provider();
+        #[cfg(all(feature = "rustls-aws-lc-rs", not(feature = "rustls-ring")))]
+        let provider = rustls::crypto::aws_lc_rs::default_provider();
+        #[cfg(all(not(feature = "rustls-ring"), not(feature = "rustls-aws-lc-rs")))]
+        compile_error!("Either rustls-ring or rustls-aws-lc-rs feature must be enabled");
+        provider
+            .install_default()
+            .expect("Failed to install CryptoProvider");
+    });
+}
+
 // Sets up a handler on the mock server which will return a 500 with the given message. This
 // will be mapped internally into a GitHub json error, making it much easier to identify the cause
 // of these test failures.

@@ -3,7 +3,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::checks::{AutoTriggerCheck, CheckSuite, CheckSuitePreferences};
 use octocrab::models::{AppId, CheckRunId, CheckSuiteId};
 use octocrab::params::repos::Commitish;
@@ -37,6 +37,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_create_check_suite() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let check_suite_response: CheckSuite =
         serde_json::from_str(include_str!("resources/check_suite.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&check_suite_response);

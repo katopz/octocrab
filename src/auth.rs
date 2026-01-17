@@ -46,9 +46,9 @@ pub enum Auth {
     /// Authenticate using a Github personal access token
     PersonalToken(SecretString),
     /// Authenticate as a Github App
-    App(AppAuth),
+    App(Box<AppAuth>),
     /// Authenticate as a Github OAuth App
-    OAuth(OAuth),
+    OAuth(Box<OAuth>),
     /// Authenticate using a User Access Token
     UserAccessToken(SecretString),
 }

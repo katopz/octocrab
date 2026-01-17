@@ -75,6 +75,8 @@ impl<'octo, 'b> ListUserReposBuilder<'octo, 'b> {
 mod tests {
     #[tokio::test]
     async fn serialize() {
+        #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+        crate::ensure_crypto_provider_initialized();
         let octocrab = crate::Octocrab::default();
         let handler = octocrab.users("foo");
         let request = handler

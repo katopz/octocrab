@@ -4,7 +4,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::GitSshKey;
 use octocrab::Octocrab;
 
@@ -39,6 +39,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_respond_to_get_git_ssh_key() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let mocked_response: GitSshKey =
         serde_json::from_str(include_str!("resources/user_git_ssh_key_created.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&mocked_response);

@@ -1,7 +1,7 @@
 // Tests for calls to the /projects/{project_id} API.
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models::Project, Octocrab};
 use serde::{Deserialize, Serialize};
 use wiremock::{
@@ -32,6 +32,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_create_user_project() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let org_project: Project =
         serde_json::from_str(include_str!("resources/project.json")).unwrap();
 

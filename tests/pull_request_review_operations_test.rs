@@ -4,10 +4,10 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 use octocrab::models::pulls::{Review, ReviewAction, ReviewComment};
 use octocrab::Octocrab;
 
-use crate::mock_error::setup_error_handler;
-
 /// Unit test for calls to the `/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}` endpoint
 mod mock_error;
+
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 
 const OWNER: &str = "XAMPPRocky";
 const REPO: &str = "octocrab";
@@ -21,6 +21,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_work_with_specific_review() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let review_ops_response: Review =
         serde_json::from_str(include_str!("resources/get_pull_request_review.json")).unwrap();
     let review_comments_response: Vec<ReviewComment> = serde_json::from_str(include_str!(

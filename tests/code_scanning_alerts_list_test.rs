@@ -3,7 +3,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::code_scannings::CodeScanningAlert;
 use octocrab::Octocrab;
 
@@ -47,6 +47,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn check_list_200() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let s = include_str!("resources/codescanning_alerts_multiple.json");
     let alert: Vec<CodeScanningAlert> = serde_json::from_str(s).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&alert);

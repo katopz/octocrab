@@ -256,8 +256,6 @@ use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceE
 use bytes::Bytes;
 use http::header::USER_AGENT;
 use http::request::Builder;
-#[cfg(feature = "opentls")]
-use hyper_tls::HttpsConnector;
 
 #[cfg(feature = "rustls")]
 // Removed: use hyper_rustls::HttpsConnectorBuilder;
@@ -636,7 +634,7 @@ impl OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady>
     /// `key`: RSA private key in PEM format.
     pub fn app(mut self, app_id: AppId, key: &str) -> Result<Self> {
         let app_auth = AppAuth::new(app_id, key)?;
-        self.config.auth = Auth::App(app_auth);
+        self.config.auth = Auth::App(Box::new(app_auth));
         Ok(self)
     }
 
@@ -649,7 +647,7 @@ impl OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady>
 
     /// Authenticate with an OAuth token.
     pub fn oauth(mut self, oauth: auth::OAuth) -> Self {
-        self.config.auth = Auth::OAuth(oauth);
+        self.config.auth = Auth::OAuth(Box::new(oauth));
         self
     }
 
@@ -810,7 +808,7 @@ impl OctocrabBuilder<NoSvc, DefaultOctocrabBuilderConfig, NoAuth, NotLayerReady>
                 Some(format!("Bearer {}", token.expose_secret()).parse().unwrap()),
                 AuthState::None,
             ),
-            Auth::App(app_auth) => (None, AuthState::App(app_auth)),
+            Auth::App(app_auth) => (None, AuthState::App(*app_auth)),
             Auth::OAuth(device) => (
                 Some(
                     format!(
@@ -1910,11 +1908,34 @@ impl Octocrab {
     }
 }
 
+// Global CryptoProvider initialization for rustls tests
+// This will be initialized when first accessed during tests
+#[cfg(all(test, feature = "rustls", not(target_arch = "wasm32")))]
+pub(crate) fn ensure_crypto_provider_initialized() {
+    use std::sync::OnceLock;
+
+    static INIT: OnceLock<()> = OnceLock::new();
+    INIT.get_or_init(|| {
+        #[cfg(feature = "rustls-ring")]
+        let provider = rustls::crypto::ring::default_provider();
+        #[cfg(all(feature = "rustls-aws-lc-rs", not(feature = "rustls-ring")))]
+        let provider = rustls::crypto::aws_lc_rs::default_provider();
+        #[cfg(all(not(feature = "rustls-ring"), not(feature = "rustls-aws-lc-rs")))]
+        compile_error!("Either rustls-ring or rustls-aws-lc-rs feature must be enabled");
+        provider
+            .install_default()
+            .expect("Failed to install CryptoProvider");
+    });
+}
+
 #[cfg(test)]
 mod tests {
     // tokio runtime seems to be needed for tower: https://users.rust-lang.org/t/no-reactor-running-when-calling-runtime-spawn/81256
     #[tokio::test]
     async fn parametrize_uri_valid() {
+        // Initialize CryptoProvider for rustls before running tests
+        #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+        crate::ensure_crypto_provider_initialized();
         //Previously, invalid characters were handled by url lib's parse function.
         //Todo: should we handle encoding of uri routes ourselves?
         let uri = crate::instance()
@@ -1925,6 +1946,9 @@ mod tests {
 
     #[tokio::test]
     async fn extra_headers() {
+        // Initialize CryptoProvider for rustls before running tests
+        #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+        crate::ensure_crypto_provider_initialized();
         use http::header::HeaderName;
         use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
         let response = ResponseTemplate::new(304).append_header("etag", "\"abcd\"");

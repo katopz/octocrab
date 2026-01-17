@@ -5,10 +5,10 @@ use octocrab::models::pulls::Comment;
 use octocrab::models::CommentId;
 use octocrab::Octocrab;
 
-use crate::mock_error::setup_error_handler;
-
 /// Unit test for calls to the `/repos/{owner}/{repo}/pulls/comments/{comment_id}` endpoint
 mod mock_error;
+
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 
 const OWNER: &str = "XAMPPRocky";
 const REPO: &str = "octocrab";
@@ -20,6 +20,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_work_with_review_comment() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let review_comment_response: Comment =
         serde_json::from_str(include_str!("resources/pull_request_review_comment.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&review_comment_response);

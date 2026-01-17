@@ -346,6 +346,8 @@ impl<'octo, 'b> ListJobsBuilder<'octo, 'b> {
 mod tests {
     #[tokio::test]
     async fn serialize() {
+        #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+        crate::ensure_crypto_provider_initialized();
         use crate::params::workflows::Filter;
 
         let octocrab = crate::Octocrab::default();

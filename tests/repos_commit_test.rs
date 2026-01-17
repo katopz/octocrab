@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models::repos::RepoCommit, Octocrab};
 use wiremock::{
     matchers::{method, path},
@@ -36,6 +36,9 @@ const REPO: &str = "some-repo";
 
 #[tokio::test]
 async fn should_return_list_of_commits() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let repos_list_commits_json: Vec<RepoCommit> =
         serde_json::from_str(include_str!("resources/repos_list_commits.json")).unwrap();
     let template = ResponseTemplate::new(201).set_body_json(&repos_list_commits_json);

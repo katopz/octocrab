@@ -3,7 +3,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::{Author, Contributor};
 use octocrab::Octocrab;
 
@@ -35,6 +35,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_return_repo_contributors() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let repo_contributors_response: Vec<Contributor> =
         serde_json::from_str(include_str!("resources/repo_contributors.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&repo_contributors_response);

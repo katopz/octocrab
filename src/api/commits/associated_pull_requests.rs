@@ -73,6 +73,8 @@ mod tests {
 
     #[tokio::test]
     async fn associated_pull_requests_serializes_correctly() {
+        #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+        crate::ensure_crypto_provider_initialized();
         use super::PullRequestTarget;
 
         let octocrab = crate::Octocrab::default();

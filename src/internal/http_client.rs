@@ -30,9 +30,32 @@ pub type HttpClient =
 #[cfg(target_arch = "wasm32")]
 pub type HttpClient = WasmClient;
 
-/// Creates a new HTTP client appropriate for the current platform
+/// Creates a new HTTP client appropriate for for current platform
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_client() -> Result<HttpClient, String> {
+    // Initialize CryptoProvider for rustls before creating client
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    {
+        use std::sync::OnceLock;
+        static INIT: OnceLock<()> = OnceLock::new();
+        INIT.get_or_init(|| {
+            #[cfg(feature = "rustls-ring")]
+            let provider = rustls::crypto::ring::default_provider();
+            #[cfg(all(feature = "rustls-aws-lc-rs", not(feature = "rustls-ring")))]
+            let provider = rustls::crypto::aws_lc_rs::default_provider();
+            #[cfg(all(not(feature = "rustls-ring"), not(feature = "rustls-aws-lc-rs")))]
+            compile_error!("Either rustls-ring or rustls-aws-lc-rs feature must be enabled");
+            // Ignore AlreadySet error if provider is already installed
+            if let Err(e) = provider.install_default() {
+                if format!("{:?}", e).contains("AlreadySet") {
+                    // Provider already installed, ignore
+                } else {
+                    eprintln!("Failed to install CryptoProvider: {:?}", e);
+                }
+            }
+        });
+    }
+
     let connector = {
         let builder = hyper_rustls::HttpsConnectorBuilder::new();
         let builder = builder
@@ -241,6 +264,9 @@ mod tests {
     #[test]
     #[cfg(not(target_arch = "wasm32"))]
     fn test_create_native_client() {
+        // Initialize CryptoProvider for rustls before running tests
+        #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+        crate::ensure_crypto_provider_initialized();
         let client = create_client();
         assert!(client.is_ok());
     }

@@ -1,7 +1,7 @@
 // Tests for calls to the /orgs/{org}/teams/{team}/invitations API.
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models::teams::TeamInvitation, Octocrab, Page};
 use serde::{Deserialize, Serialize};
 use wiremock::{
@@ -41,6 +41,9 @@ const TEAM: &str = "team-name";
 
 #[tokio::test]
 async fn should_return_page_with_invitations() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let team_invitations: TeamInvitation =
         serde_json::from_str(include_str!("resources/team_invitations.json")).unwrap();
     let page_response = FakePage {

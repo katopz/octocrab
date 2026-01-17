@@ -1,6 +1,6 @@
 /// Tests API calls related to check runs of a specific commit.
 mod mock_error;
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::UserProfile;
 use octocrab::Octocrab;
 use wiremock::{
@@ -32,6 +32,9 @@ async fn setup_api(template: ResponseTemplate) -> MockServer {
 
 #[tokio::test]
 async fn should_return_deserialized_user() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let mocked_response: UserProfile =
         serde_json::from_str(include_str!("resources/user_data.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&mocked_response);

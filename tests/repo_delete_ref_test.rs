@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{params::repos::Reference, Octocrab};
 use wiremock::{
     matchers::{method, path},
@@ -38,6 +38,9 @@ const BRANCH: &str = "foo";
 
 #[tokio::test]
 async fn should_delete_reference() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let template = ResponseTemplate::new(204);
     let mock_server = setup_delete_ref_api(template).await;
     let client = setup_octocrab(&mock_server.uri());

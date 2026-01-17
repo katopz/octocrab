@@ -1,7 +1,7 @@
 // Tests for calls to the /repos/{owner}/{repo}/events API.
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{
     etag::{EntityTag, Etagged},
     models::events,
@@ -44,6 +44,9 @@ const REPO: &str = "repo";
 
 #[tokio::test]
 async fn should_return_page_with_events_and_etag() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let event: events::Event =
         serde_json::from_str(include_str!("resources/create_event.json")).unwrap();
     let page_response = FakePage { items: vec![event] };

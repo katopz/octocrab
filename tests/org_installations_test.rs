@@ -1,7 +1,7 @@
 // Tests for calls to the /orgs/{org}/installation endpoint.
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::{Author, Installation, InstallationId};
 use octocrab::Octocrab;
 use wiremock::{
@@ -31,6 +31,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_return_org_installation() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let org_installation_response: Installation =
         serde_json::from_str(include_str!("resources/orgs_installation_event.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&org_installation_response);

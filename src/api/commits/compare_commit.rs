@@ -58,6 +58,8 @@ mod tests {
 
     #[tokio::test]
     async fn compare_commits_serializes_correctly() {
+        #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+        crate::ensure_crypto_provider_initialized();
         let octocrab = crate::Octocrab::default();
         let handler = octocrab.commits("owner", "repo");
         let comparison = handler.compare("base", "head");

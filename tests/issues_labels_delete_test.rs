@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models, Octocrab};
 use wiremock::{
     matchers::{method, path},
@@ -64,6 +64,9 @@ const LABEL_NAME: &str = "some-label";
 
 #[tokio::test]
 async fn should_remove_label() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let remaining_issue_labels: Vec<models::Label> =
         serde_json::from_str(include_str!("resources/issues_remove_label.json")).unwrap();
 

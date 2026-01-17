@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::Octocrab;
 use wiremock::{
     matchers::{method, path},
@@ -40,6 +40,9 @@ const USERNAME: &str = "someusername";
 
 #[tokio::test]
 async fn is_collaborators_returns_true() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let template = ResponseTemplate::new(204);
     let mock_server = setup_repo_collaborator_api(template).await;
     let client = setup_octocrab(&mock_server.uri());

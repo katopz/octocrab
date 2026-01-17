@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{
     models::orgs_copilot::billing::{SeatsCancelled, SeatsCreated},
     Octocrab,
@@ -36,6 +36,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_create_seats_team() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let billing: SeatsCreated = serde_json::from_str(include_str!(
         "resources/org_copilot_billing_seats_created.json"
     ))

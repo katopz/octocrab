@@ -1,7 +1,7 @@
 /// Tests API calls related to check runs of a specific commit.
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::checks::ListCheckRuns;
 use octocrab::models::CheckRunId;
 use octocrab::params::repos::Reference;
@@ -36,6 +36,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_return_page_with_check_runs() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let mocked_response: ListCheckRuns =
         serde_json::from_str(include_str!("resources/commit_check_runs.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&mocked_response);

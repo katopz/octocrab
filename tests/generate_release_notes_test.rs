@@ -1,7 +1,7 @@
 /// Tests generating release notes:
 /// /repos/{owner}/{repo}/releases/generate-notes
 mod mock_error;
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::models::repos::ReleaseNotes;
 use octocrab::Octocrab;
 use wiremock::{
@@ -33,6 +33,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_return_page_with_check_runs() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let owner = "owner";
     let repo = "repo";
     let tag_name = "2.0.0";

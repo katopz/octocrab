@@ -1,6 +1,6 @@
 mod mock_error;
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models::orgs_copilot::billing::CopilotBillingSeats, Octocrab};
 use wiremock::{
     matchers::{method, path},
@@ -32,6 +32,9 @@ const ORG: &str = "org";
 
 #[tokio::test]
 async fn should_return_page_with_billing_seats_info() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let billing: CopilotBillingSeats =
         serde_json::from_str(include_str!("resources/org_copilot_billing_seats.json")).unwrap();
     let template = ResponseTemplate::new(200).set_body_json(&billing);

@@ -5,7 +5,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{models, Octocrab};
 
 async fn setup_mock_http_server(
@@ -34,6 +34,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_respond_to_get_assignment() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     const ASSIGNMENT_ID: u64 = 42;
     let mocked_response: models::classroom::Assignment =
         serde_json::from_str(include_str!("resources/classroom_get_assignment.json")).unwrap();

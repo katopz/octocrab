@@ -2,7 +2,7 @@
 mod mock_error;
 
 use chrono::DateTime;
-use mock_error::setup_error_handler;
+use mock_error::{ensure_crypto_provider_initialized, setup_error_handler};
 use octocrab::{
     models::{
         repos::secrets::{
@@ -81,6 +81,9 @@ fn setup_octocrab(uri: &str) -> Octocrab {
 
 #[tokio::test]
 async fn should_return_repo_secrets() {
+    #[cfg(all(feature = "rustls", not(target_arch = "wasm32")))]
+    ensure_crypto_provider_initialized();
+
     let repo_secrets: RepositorySecrets =
         serde_json::from_str(include_str!("resources/repo_secrets.json")).unwrap();
 
